@@ -1,13 +1,19 @@
 #include "config_file.h"
 
+#include <unistd.h>
 #include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
-#define INPUT_BUFFER_SIZE 3
+#include <sys/types.h>
+#include <sys/wait.h>
 
-void readInput() {
-    char x[INPUT_BUFFER_SIZE];
-    // Error on buffer overflow
-    char* ret = fgets(x, INPUT_BUFFER_SIZE, stdin);
+#define INPUT_BUFFER_SIZE 256
+
+void readInput(char* buffer) {
+    
+    //TODO Error on buffer overflow
+    char* ret = fgets(buffer, INPUT_BUFFER_SIZE, stdin);
     if(ret == NULL) {
         fprintf(stderr, "Cannot read input\n");
     }
@@ -15,6 +21,37 @@ void readInput() {
 //    printf("Return: %s\n", ret);
 //    printf("end: %d\n", x[INPUT_BUFFER_SIZE-1]);
     
+}
+
+void executeProcess(char* cmd) {
+    int pid = fork();
+	if(pid == 0) {
+        //TODO strncpm with key
+		//set rights
+        
+        // TODO split command parameters
+		//execve(cmd, cmd, (char*) NULL); //TODO error handling
+        //cmd = "/bin/ls";
+        
+        char* paras[50];
+        int index = 0;
+        
+        char* ptr = strtok(cmd," ");
+        while(ptr != NULL) {
+            printf("parameters: %s\n", ptr);
+            paras[index] = ptr;
+            
+            ptr = strtok(NULL," ");
+        }
+        
+        char* test = "/bin/ls ";
+        printf("len %d\n", paras[0][8]);
+
+        unsigned int ret = execl(test, "ls", "-1", (char *)0);
+        printf("exec %s", strerror(errno));
+	} else {
+        wait(&pid);
+    }
 }
 
 int main() {
@@ -35,9 +72,9 @@ int main() {
     }
     
     
-    
-    readInput();
-    readInput();
+    char x[INPUT_BUFFER_SIZE];
+    readInput(x);
+    executeProcess(x);
 
     
     return 0;
