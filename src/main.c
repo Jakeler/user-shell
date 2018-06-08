@@ -13,13 +13,11 @@
 void readInput(char* buffer) {
     
     //TODO Error on buffer overflow
+    //getline?   
     char* ret = fgets(buffer, INPUT_BUFFER_SIZE, stdin);
     if(ret == NULL) {
         fprintf(stderr, "Cannot read input\n");
     }
-//    printf("Input: %s\n", x);
-//    printf("Return: %s\n", ret);
-//    printf("end: %d\n", x[INPUT_BUFFER_SIZE-1]);
     
 }
 
@@ -29,10 +27,7 @@ void executeProcess(char* cmd) {
         //TODO strncpm with key
 		//set rights
         
-        // TODO split command parameters
-		//execve(cmd, cmd, (char*) NULL); //TODO error handling
-        //cmd = "/bin/ls";
-        
+   
         char* paras[50];
         int index = 0;
         
@@ -40,14 +35,16 @@ void executeProcess(char* cmd) {
         while(ptr != NULL) {
             printf("parameters: %s\n", ptr);
             paras[index] = ptr;
+            index++;
             
             ptr = strtok(NULL," ");
         }
         
-        char* test = "/bin/ls ";
-        printf("len %d\n", paras[0][8]);
+        int end = strlen(paras[0])-1;
+        printf("val %d\n", paras[0][end]);
+        //paras[0][end] = 0;
 
-        unsigned int ret = execl(test, "ls", "-1", (char *)0);
+        unsigned int ret = execl(paras[0], "id", (char *)0);
         printf("exec %s", strerror(errno));
 	} else {
         wait(&pid);
