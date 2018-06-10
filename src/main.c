@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <stdlib.h>
-
 
 #include <sys/types.h>
 #include <grp.h>
@@ -123,17 +121,13 @@ int main() {
     }
     
     
-    //char x[INPUT_BUFFER_SIZE];
+    char x[INPUT_BUFFER_SIZE];
    
     
     while(1) {
         printf("CMD: ");
-        //char* result = readInput(x);
-        char* x = NULL;
-        size_t size = 0;
-        getline(&x, &size, stdin);
-        
-        if(size < 0|| x == NULL) { //Exit with Ctrl-D
+        char* result = readInput(x);
+        if(result == NULL || x == NULL) { //Exit with Ctrl-D
             printf("Exiting...\n");
             return 0;
         }
@@ -143,7 +137,6 @@ int main() {
         }
         char* parameters[16];
         processCmd(x, parameters);
-        //free(x);
         executeProcess(parameters);
     }  
     return 0;
