@@ -6,9 +6,28 @@
 #include <string.h>
 
 #include <sys/types.h>
+#include <grp.h>
+#include <pwd.h>
 #include <sys/wait.h>
 
 #define INPUT_BUFFER_SIZE 256
+
+struct procContext {
+    uid_t uid;
+    gid_t gid;
+    gid_t sup_gid[32]; //32 on Linux < 2.6.3, 2^16 on modern Linux
+};
+
+void dumpContext(struct procContext* con) {
+    printf("UID: %d\n", con->uid);
+    printf("GID: %d\n", con->gid);
+    
+    printf("Suplementary GIDs: ");
+    for(size_t i = 0; i < 32; i++) { //pointers dont include size, so fixed 32?
+        printf("%d ", con->sup_gid[i]);
+    }
+    printf("\n");
+}
 
 void dumpStr(char* str) {
      for(size_t i = 0; str[i] != 0; i++) {
@@ -49,8 +68,7 @@ char** processCmd(char* cmd, char** paras) {
 void executeProcess(char** parameters) {
     int pid = fork();
 	if(pid == 0) {
-        //TODO strncpm with key
-        //set rights
+        //TODO set rights from context
 
         // execvp searches in PATH if 1. arg contains no slash
         if (execvp(parameters[0], parameters)) {
@@ -63,8 +81,23 @@ void executeProcess(char** parameters) {
     }
 }
 
+void parseConfig(config_file_t* cf, struct procContext* con) {
+    for (int i = 0; i < cf->nr_entries; i++) {
+        if(strcmp(cf->entries[i].key, "user") == 0) {
+            struct passwd* user;
+            user = getpwnam(cf->entries[i].value);
+            con->uid = user->pw_uid;
+            con->gid = user->pw_gid;
+        } else if(strcmp(cf->entries[i].key, "groups") == 0) { //TODO solution for mutiple groups
+            con->sup_gid[0] = getgrnam(cf->entries[i].value)->gr_gid;
+        } else {
+            fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
+        }
+    }
+}
+
 int main() {
-    config_file_t *cf = read_config_file("./config.conf");
+    config_file_t *cf = read_config_file("./config.conf"); //TODO make function that loads command specific config
     if (cf == NULL) {
         fprintf(stderr, "Cannot open config file\n");
         return 1;
@@ -72,16 +105,19 @@ int main() {
     if (cf->nr_entries < 0) {
         fprintf(stderr, "The config file could not be parsed\n");
     }
+    
+     struct procContext* context;
+     parseConfig(cf, context);
+     dumpContext(context);    
 
-    for (int i = 0; i < cf->nr_entries; i++) {
-        printf("Key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);
-    }
+    
     if(!release_config(cf)) {
         fprintf(stderr, "Error: Could not free config\n");
     }
     
     
     char x[INPUT_BUFFER_SIZE];
+   
     
     while(1) {
         printf("CMD: ");
@@ -97,6 +133,6 @@ int main() {
         char* parameters[16];
         processCmd(x, parameters);
         executeProcess(parameters);
-    }    
+    }  
     return 0;
 }
