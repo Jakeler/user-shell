@@ -16,6 +16,7 @@ struct procContext {
     uid_t uid;
     gid_t gid;
     gid_t sup_gid[32]; //32 on Linux < 2.6.3, 2^16 on modern Linux
+    size_t sup_gid_count; //pointers dont include size, so add it?
 };
 
 void dumpContext(struct procContext* con) {
@@ -23,7 +24,7 @@ void dumpContext(struct procContext* con) {
     printf("GID: %d\n", con->gid);
     
     printf("Suplementary GIDs: ");
-    for(size_t i = 0; i < 32; i++) { //pointers dont include size, so fixed 32?
+    for(size_t i = 0; i < con->sup_gid_count; i++) { 
         printf("%d ", con->sup_gid[i]);
     }
     printf("\n");
@@ -82,14 +83,18 @@ void executeProcess(char** parameters) {
 }
 
 void parseConfig(config_file_t* cf, struct procContext* con) {
+    con->sup_gid_count = 0;
+    
     for (int i = 0; i < cf->nr_entries; i++) {
         if(strcmp(cf->entries[i].key, "user") == 0) {
             struct passwd* user;
             user = getpwnam(cf->entries[i].value);
             con->uid = user->pw_uid;
             con->gid = user->pw_gid;
-        } else if(strcmp(cf->entries[i].key, "groups") == 0) { //TODO solution for mutiple groups
-            con->sup_gid[0] = getgrnam(cf->entries[i].value)->gr_gid;
+        } else if(strcmp(cf->entries[i].key, "groups") == 0) {
+            //printf("%s\n", cf->entries[i].value);
+            con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid;
+            con->sup_gid_count++;
         } else {
             fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
         }
