@@ -18,20 +18,13 @@ void dumpStr(char* str) {
 }
 
 char* readInput(char* buffer) {    
-    //TODO Error on buffer overflow
-    //getline?   
+    //TODO Error on buffer overflow / malloc
+    //or switch to getline?   
     return fgets(buffer, INPUT_BUFFER_SIZE, stdin);
     
 }
 
-void executeProcess(char* cmd) {
-    int pid = fork();
-	if(pid == 0) {
-        //TODO strncpm with key
-		//set rights
-        
-   
-        char* paras[50];
+char** processCmd(char* cmd, char** paras) {
         int index = 0;
         
         char* ptr = strtok(cmd," ");
@@ -49,9 +42,18 @@ void executeProcess(char* cmd) {
             index++;
             ptr = strtok(NULL," ");
         }
+        paras[index] = (char*)0;
+        return paras;
+}
+
+void executeProcess(char** parameters) {
+    int pid = fork();
+	if(pid == 0) {
+        //TODO strncpm with key
+        //set rights
 
         // execvp searches in PATH if 1. arg contains no slash
-        if (execvp(paras[0], paras) != NULL) {
+        if (execvp(parameters[0], parameters)) {
             printf("exec %s\n", strerror(errno));
             _exit(1);            
         }
@@ -84,15 +86,17 @@ int main() {
     while(1) {
         printf("CMD: ");
         char* result = readInput(x);
-        if(result == NULL || x == NULL) {
+        if(result == NULL || x == NULL) { //Exit with Ctrl-D
             printf("Exiting...\n");
-            return 0; //Exit with Ctrl-D
+            return 0;
         }
         if(x[0] == '\n') {
             //printf("No input\n");
             continue;
         }
-        executeProcess(x);
+        char* parameters[16];
+        processCmd(x, parameters);
+        executeProcess(parameters);
     }    
     return 0;
 }
