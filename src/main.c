@@ -10,14 +10,17 @@
 
 #define INPUT_BUFFER_SIZE 256
 
-void readInput(char* buffer) {
-    
+void dumpStr(char* str) {
+     for(size_t i = 0; str[i] != 0; i++) {
+         printf("%x ", str[i]);
+    }
+    printf("\n");
+}
+
+char* readInput(char* buffer) {    
     //TODO Error on buffer overflow
     //getline?   
-    char* ret = fgets(buffer, INPUT_BUFFER_SIZE, stdin);
-    if(ret == NULL) {
-        fprintf(stderr, "Cannot read input\n");
-    }
+    return fgets(buffer, INPUT_BUFFER_SIZE, stdin);
     
 }
 
@@ -33,20 +36,27 @@ void executeProcess(char* cmd) {
         
         char* ptr = strtok(cmd," ");
         while(ptr != NULL) {
-            printf("parameters: %s\n", ptr);
-            paras[index] = ptr;
-            index++;
+            //printf("parameters: %s\n", ptr);
             
+            int lastChar = strlen(ptr)-1;
+            //printf("last: %x\n", ptr[lastChar]);
+            if(ptr[lastChar] == '\n') {
+                ptr[lastChar] = '\0';
+            }
+            //dumpStr(ptr);
+            paras[index] = ptr;
+            
+            index++;
             ptr = strtok(NULL," ");
         }
-        
-        int end = strlen(paras[0])-1;
-        printf("val %d\n", paras[0][end]);
-        //paras[0][end] = 0;
 
-        unsigned int ret = execl(paras[0], "id", (char *)0);
-        printf("exec %s", strerror(errno));
+        // execvp searches in PATH if 1. arg contains no slash
+        if (execvp(paras[0], paras) != NULL) {
+            printf("exec %s\n", strerror(errno));
+            _exit(1);            
+        }
 	} else {
+        //printf("PID: %d", pid);
         wait(&pid);
     }
 }
@@ -70,9 +80,19 @@ int main() {
     
     
     char x[INPUT_BUFFER_SIZE];
-    readInput(x);
-    executeProcess(x);
-
     
+    while(1) {
+        printf("CMD: ");
+        char* result = readInput(x);
+        if(result == NULL || x == NULL) {
+            printf("Exiting...\n");
+            return 0; //Exit with Ctrl-D
+        }
+        if(x[0] == '\n') {
+            //printf("No input\n");
+            continue;
+        }
+        executeProcess(x);
+    }    
     return 0;
 }
