@@ -16,6 +16,7 @@
 #define INPUT_BUFFER_SIZE 256
 
 typedef struct {
+    char* path;
     uid_t uid;
     gid_t gid;
     gid_t sup_gid[32]; //32 on Linux < 2.6.3, 2^16 on modern Linux
@@ -31,6 +32,10 @@ void dumpContext(procContext* con) {
         printf("%d ", con->sup_gid[i]);
     }
     printf("\n");
+    if (strlen(con->path) == 0) {
+        return;
+    }
+    printf("Path: %s\n", con->path);
 }
 
 void dumpStr(char* str) {
@@ -98,6 +103,8 @@ void parseConfig(config_file_t* cf, procContext* con) {
             //printf("%s\n", cf->entries[i].value);
             con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid;
             con->sup_gid_count++;
+        } else if(strcmp(cf->entries[i].key, "path") == 0) {
+            con->path = cf->entries[i].value;        
         } else {
             fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
         }
@@ -115,6 +122,7 @@ int main() {
     }
     
      procContext* context;
+     context->path = ""; //Initialise and check if empty
      parseConfig(cf, context);
      dumpContext(context);    
 
