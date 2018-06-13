@@ -1,5 +1,8 @@
+#define _GNU_SOURCE
+
 #include "config_file.h"
 
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
@@ -12,14 +15,14 @@
 
 #define INPUT_BUFFER_SIZE 256
 
-struct procContext {
+typedef struct {
     uid_t uid;
     gid_t gid;
     gid_t sup_gid[32]; //32 on Linux < 2.6.3, 2^16 on modern Linux
     size_t sup_gid_count; //pointers dont include size, so add it?
-};
+} procContext;
 
-void dumpContext(struct procContext* con) {
+void dumpContext(procContext* con) {
     printf("UID: %d\n", con->uid);
     printf("GID: %d\n", con->gid);
     
@@ -82,7 +85,7 @@ void executeProcess(char** parameters) {
     }
 }
 
-void parseConfig(config_file_t* cf, struct procContext* con) {
+void parseConfig(config_file_t* cf, procContext* con) {
     con->sup_gid_count = 0;
     
     for (int i = 0; i < cf->nr_entries; i++) {
@@ -111,7 +114,7 @@ int main() {
         fprintf(stderr, "The config file could not be parsed\n");
     }
     
-     struct procContext* context;
+     procContext* context;
      parseConfig(cf, context);
      dumpContext(context);    
 
@@ -137,6 +140,8 @@ int main() {
         }
         char* parameters[16];
         processCmd(x, parameters);
+        //printf("filename: %s", basename(parameters[0]));
+        //system(x);
         executeProcess(parameters);
     }  
     return 0;
