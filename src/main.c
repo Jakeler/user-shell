@@ -74,11 +74,17 @@ char** processCmd(char* cmd, char** paras) {
         return paras;
 }
 
-void executeProcess(char** parameters) {
+void executeProcess(char** parameters, procContext* con) {
     int pid = fork();
 	if(pid == 0) {
-        //TODO set rights from context
-
+        
+        setresuid(con->uid, con->uid, con->uid);
+        perror("UID set");
+        setresgid(con->gid, con->gid, con->gid);
+        perror("GID set");
+        setgroups(con->sup_gid_count, con->sup_gid);
+        perror("Groups set");
+        
         // execvp searches in PATH if 1. arg contains no slash
         if (execvp(parameters[0], parameters)) {
             printf("exec %s\n", strerror(errno));
@@ -100,8 +106,7 @@ void parseConfig(config_file_t* cf, procContext* con) {
             con->uid = user->pw_uid;
             con->gid = user->pw_gid;
         } else if(strcmp(cf->entries[i].key, "groups") == 0) {
-            //printf("%s\n", cf->entries[i].value);
-            con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid;
+            con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid; //Error handling
             con->sup_gid_count++;
         } else if(strcmp(cf->entries[i].key, "path") == 0) {
             con->path = cf->entries[i].value;        
@@ -124,7 +129,7 @@ int main() {
      procContext* context;
      context->path = ""; //Initialise and check if empty
      parseConfig(cf, context);
-     dumpContext(context);    
+     dumpContext(context);
 
     
     if(!release_config(cf)) {
@@ -150,7 +155,7 @@ int main() {
         processCmd(x, parameters);
         //printf("filename: %s", basename(parameters[0]));
         //system(x);
-        executeProcess(parameters);
+        executeProcess(parameters, context);
     }  
     return 0;
 }
