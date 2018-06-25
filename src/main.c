@@ -66,6 +66,7 @@ char** processCmd(char* cmd, char** paras) {
             }
             //dumpStr(ptr);
             paras[index] = ptr;
+            printf("PARA: %s\n", ptr);
             
             index++;
             ptr = strtok(NULL," ");
@@ -90,6 +91,7 @@ void executeProcess(char** parameters, procContext* con) {
             printf("exec %s\n", strerror(errno));
             _exit(1);            
         }
+        perror("exec");
 	} else {
         //printf("PID: %d", pid);
         wait(&pid);
@@ -109,7 +111,7 @@ void parseConfig(config_file_t* cf, procContext* con) {
             con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid; //Error handling
             con->sup_gid_count++;
         } else if(strcmp(cf->entries[i].key, "path") == 0) {
-            con->path = cf->entries[i].value;        
+            //con->path = cf->entries[i].value;        
         } else {
             fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
         }
@@ -126,10 +128,10 @@ int main() {
         fprintf(stderr, "The config file could not be parsed\n");
     }
     
-     procContext* context;
-     context->path = ""; //Initialise and check if empty
-     parseConfig(cf, context);
-     dumpContext(context);
+     procContext context;
+     //context->path = ""; //Initialise and check if empty
+     parseConfig(cf, &context);
+     dumpContext(&context);
 
     
     if(!release_config(cf)) {
@@ -153,9 +155,9 @@ int main() {
         }
         char* parameters[16];
         processCmd(x, parameters);
-        //printf("filename: %s", basename(parameters[0]));
+        printf("filename: %s\n", basename(parameters[0]));
         //system(x);
-        executeProcess(parameters, context);
+        executeProcess(parameters, &context);
     }  
     return 0;
 }
