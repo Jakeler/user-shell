@@ -163,9 +163,9 @@ char** processCmd(char* cmd, char** paras) {
 int main() {
     char x[INPUT_BUFFER_SIZE];
    
+    printf("\nWelcome to the User Shell!\n");
     
     while(1) {
-        printf("\nWelcome to the User Shell!\n");
         printf("CMD: ");
         char* result = readInput(x);
         if(result == NULL || x == NULL) { //Exit with Ctrl-D
@@ -193,20 +193,18 @@ int main() {
             }
             
             procContext context;
-            context.path = NULL; //Initialise
+            //context.path = NULL; //Initialise
             parseConfig(cf, &context);
             dumpContext(&context);
             
-            if(!release_config(cf)) {
-                fprintf(stderr, "Error: Could not free config\n");
-            }
-            
-            printf("CMD %s\n", parameters[0]);
             parameters[0] = context.path; //Use always path from config
             if (parameters[0] != NULL) {
                 executeProcess(parameters, &context);
             }
-            printf("HIER %s\n", parameters[0]);
+            
+            if(!release_config(cf)) {
+                fprintf(stderr, "Error: Could not free config\n");
+            }
         } else {
             executeProcess(parameters, NULL);
         }
