@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <errno.h> 
 #include <string.h>
-
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <grp.h>
 #include <pwd.h>
@@ -24,15 +24,31 @@ typedef struct {
 } procContext;
 
 void executeProcess(char** parameters, procContext* con) {
+    // Save current IDs
+    uid_t ruid, euid, suid;
+    getresuid(&ruid, &euid, &suid);
+    gid_t rgid, egid, sgid;
+    getresgid(&rgid, &egid, &sgid);
+    
+    gid_t sup_gid[32];
+    int group_count = getgroups(0, sup_gid);
+    
+    // Change IDs before fork to give it the changes
+    if (con != NULL) {
+        errno = 0;
+        setresuid(con->uid, con->uid, con->uid);
+        perror("UID set");
+        errno = 0;
+        setresgid(con->gid, con->gid, con->gid);
+        perror("GID set");
+        errno = 0;
+        setgroups(con->sup_gid_count, con->sup_gid);
+        perror("Groups set");
+    }
+    
     int pid = fork();
 	if(pid == 0) {
         
-        setresuid(con->uid, con->uid, con->uid);
-        perror("UID set");
-        setresgid(con->gid, con->gid, con->gid);
-        perror("GID set");
-        setgroups(con->sup_gid_count, con->sup_gid);
-        perror("Groups set");
         
         // execvp searches in PATH if 1. arg contains no slash
         if (execvp(parameters[0], parameters)) {
@@ -41,7 +57,17 @@ void executeProcess(char** parameters, procContext* con) {
         }
         perror("exec");
 	} else {
-        //printf("PID: %d", pid);
+        // Set to original id
+        errno = 0;
+        setresuid(ruid, euid, suid);
+        perror("UID set");
+        errno = 0;
+        setresgid(rgid, egid, sgid);
+        perror("GID set");
+        errno = 0;
+        setgroups(group_count, sup_gid);
+        perror("Groups set");
+    
         wait(&pid);
     }
 }
@@ -126,7 +152,7 @@ char** processCmd(char* cmd, char** paras) {
             }
             //dumpStr(ptr);
             paras[index] = ptr;
-            printf("PARA: %s\n", ptr);
+            //printf("PARA: %s\n", ptr);
             
             index++;
             ptr = strtok(NULL," ");
@@ -141,6 +167,7 @@ int main() {
    
     
     while(1) {
+        printf("Welcome to the User Shell!\n");
         printf("CMD: ");
         char* result = readInput(x);
         if(result == NULL || x == NULL) { //Exit with Ctrl-D
@@ -157,24 +184,30 @@ int main() {
         char cf_path[256];
         sprintf(cf_path, "./etc/ush/%s.conf", basename(parameters[0]));
         
-        config_file_t *cf = read_config_file(cf_path); //TODO make function that loads command specific config
-        if (cf == NULL || cf->nr_entries < 0) {
-            fprintf(stderr, "Cannot open config file, using standard user, groups...\n");
-            return 1;
-        }
+        struct stat cf_stats;
+        int stat_status = stat(cf_path, &cf_stats);
         
-        procContext context;
-        context.path = NULL; //Initialise
-        context.path = NULL; //Initialise
-        parseConfig(cf, &context);
-        dumpContext(&context);
-
+        if (stat_status == 0) {
+            config_file_t *cf = read_config_file(cf_path);
+            if (cf == NULL || cf->nr_entries < 0) {
+                fprintf(stderr, "Cannot open config file, using standard user, groups...\n");
+                return 1;
+            }
+            
+            procContext context;
+            context.path = NULL; //Initialise
+            parseConfig(cf, &context);
+            dumpContext(&context);
+            
+            if(!release_config(cf)) {
+                fprintf(stderr, "Error: Could not free config\n");
+            }
+            
+            executeProcess(parameters, &context);
+        } else {
+            executeProcess(parameters, NULL);
+        }        
         
-        if(!release_config(cf)) {
-            fprintf(stderr, "Error: Could not free config\n");
-        }
-        
-        executeProcess(parameters, &context);
     }  
     return 0;
 }
