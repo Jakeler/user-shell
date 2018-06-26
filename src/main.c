@@ -185,7 +185,27 @@ int main() {
         struct stat cf_stats;
         int stat_status = stat(cf_path, &cf_stats);
         
-        if (stat_status == 0) {
+        int error = 0;
+        
+        if (stat_status != 0) {
+            printf("Config file for command %s not found, using standard\n", parameters[0]);
+            error++;
+        }
+        
+        if ((S_IWOTH & cf_stats.st_mode) != 0) {
+            printf("Ignoring config file, because of set write bit for others\n");
+            error++;
+        }
+        if ((S_IWGRP & cf_stats.st_mode) != 0) {
+            printf("Ignoring config file, because of set write bit for group\n");
+            error++;
+        }
+        
+
+        
+        
+        
+        if (error == 0) {
             config_file_t *cf = read_config_file(cf_path);
             if (cf == NULL || cf->nr_entries < 0) {
                 fprintf(stderr, "Cannot open config file, using standard user, groups...\n");
@@ -193,9 +213,17 @@ int main() {
             }
             
             procContext context;
-            //context.path = NULL; //Initialise
+            context.path = NULL; //Initialise
             parseConfig(cf, &context);
             dumpContext(&context);
+            
+            printf("file: %d\tconfig: %d", cf_stats.st_uid, context.uid);
+        
+            if (cf_stats.st_uid != context.uid && cf_stats.st_uid != 0) {
+                printf("Ignoring config file, because of other (non root) owner\n");
+                executeProcess(parameters, NULL);
+                continue; //Skip execution with config context
+            }
             
             parameters[0] = context.path; //Use always path from config
             if (parameters[0] != NULL) {
@@ -205,7 +233,7 @@ int main() {
             if(!release_config(cf)) {
                 fprintf(stderr, "Error: Could not free config\n");
             }
-        } else {
+        } else { //Execute without changing context 
             executeProcess(parameters, NULL);
         }
         
