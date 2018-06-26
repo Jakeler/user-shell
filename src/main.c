@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <errno.h>
+#include <errno.h> 
 #include <string.h>
 
 #include <sys/types.h>
@@ -23,6 +23,49 @@ typedef struct {
     size_t sup_gid_count; //pointers dont include size, so add it?
 } procContext;
 
+void executeProcess(char** parameters, procContext* con) {
+    int pid = fork();
+	if(pid == 0) {
+        
+        setresuid(con->uid, con->uid, con->uid);
+        perror("UID set");
+        setresgid(con->gid, con->gid, con->gid);
+        perror("GID set");
+        setgroups(con->sup_gid_count, con->sup_gid);
+        perror("Groups set");
+        
+        // execvp searches in PATH if 1. arg contains no slash
+        if (execvp(parameters[0], parameters)) {
+            printf("exec %s\n", strerror(errno));
+            _exit(1);            
+        }
+        perror("exec");
+	} else {
+        //printf("PID: %d", pid);
+        wait(&pid);
+    }
+}
+
+void parseConfig(config_file_t* cf, procContext* con) {
+    con->sup_gid_count = 0;
+    
+    for (int i = 0; i < cf->nr_entries; i++) {
+        if(strcmp(cf->entries[i].key, "user") == 0) {
+            struct passwd* user;
+            user = getpwnam(cf->entries[i].value);
+            con->uid = user->pw_uid;
+            con->gid = user->pw_gid;
+        } else if(strcmp(cf->entries[i].key, "groups") == 0) {
+            con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid; //Error handling
+            con->sup_gid_count++;
+        } else if(strcmp(cf->entries[i].key, "path") == 0) {
+            con->path = cf->entries[i].value;        
+        } else {
+            fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
+        }
+    }
+}
+
 void dumpContext(procContext* con) {
     printf("UID: %d\n", con->uid);
     printf("GID: %d\n", con->gid);
@@ -32,7 +75,8 @@ void dumpContext(procContext* con) {
         printf("%d ", con->sup_gid[i]);
     }
     printf("\n");
-    if (strlen(con->path) == 0) {
+    if (con->path == NULL) {
+        printf("No path included\n");
         return;
     }
     printf("Path: %s\n", con->path);
@@ -75,48 +119,7 @@ char** processCmd(char* cmd, char** paras) {
         return paras;
 }
 
-void executeProcess(char** parameters, procContext* con) {
-    int pid = fork();
-	if(pid == 0) {
-        
-        setresuid(con->uid, con->uid, con->uid);
-        perror("UID set");
-        setresgid(con->gid, con->gid, con->gid);
-        perror("GID set");
-        setgroups(con->sup_gid_count, con->sup_gid);
-        perror("Groups set");
-        
-        // execvp searches in PATH if 1. arg contains no slash
-        if (execvp(parameters[0], parameters)) {
-            printf("exec %s\n", strerror(errno));
-            _exit(1);            
-        }
-        perror("exec");
-	} else {
-        //printf("PID: %d", pid);
-        wait(&pid);
-    }
-}
 
-void parseConfig(config_file_t* cf, procContext* con) {
-    con->sup_gid_count = 0;
-    
-    for (int i = 0; i < cf->nr_entries; i++) {
-        if(strcmp(cf->entries[i].key, "user") == 0) {
-            struct passwd* user;
-            user = getpwnam(cf->entries[i].value);
-            con->uid = user->pw_uid;
-            con->gid = user->pw_gid;
-        } else if(strcmp(cf->entries[i].key, "groups") == 0) {
-            con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid; //Error handling
-            con->sup_gid_count++;
-        } else if(strcmp(cf->entries[i].key, "path") == 0) {
-            //con->path = cf->entries[i].value;        
-        } else {
-            fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
-        }
-    }
-}
 
 int main() {
     config_file_t *cf = read_config_file("./config.conf"); //TODO make function that loads command specific config
@@ -129,7 +132,8 @@ int main() {
     }
     
      procContext context;
-     //context->path = ""; //Initialise and check if empty
+     context.path = NULL; //Initialise
+     context.path = NULL; //Initialise
      parseConfig(cf, &context);
      dumpContext(&context);
 
