@@ -46,24 +46,40 @@ void executeProcess(char** parameters, procContext* con) {
     }
 }
 
-void parseConfig(config_file_t* cf, procContext* con) {
+int parseConfig(config_file_t* cf, procContext* con) {
+    int error_count = 0;
+    
     con->sup_gid_count = 0;
     
     for (int i = 0; i < cf->nr_entries; i++) {
         if(strcmp(cf->entries[i].key, "user") == 0) {
-            struct passwd* user;
-            user = getpwnam(cf->entries[i].value);
-            con->uid = user->pw_uid;
-            con->gid = user->pw_gid;
+            struct passwd* user = getpwnam(cf->entries[i].value);
+            if (user == NULL) {
+                error_count++;
+                printf("User %s not found\n", cf->entries[i].value);
+                perror("User: ");
+            } else {
+                con->uid = user->pw_uid;
+                con->gid = user->pw_gid;
+            }
         } else if(strcmp(cf->entries[i].key, "groups") == 0) {
-            con->sup_gid[con->sup_gid_count] = getgrnam(cf->entries[i].value)->gr_gid; //Error handling
-            con->sup_gid_count++;
+            struct group* grp = getgrnam(cf->entries[i].value);
+            if (grp == NULL) {
+                error_count++;
+                printf("Group %s not found\n", cf->entries[i].value);
+                perror("Groups: ");
+            } else {
+                con->sup_gid[con->sup_gid_count] = grp->gr_gid; //Error handling
+                con->sup_gid_count++;
+            }
         } else if(strcmp(cf->entries[i].key, "path") == 0) {
-            con->path = cf->entries[i].value;        
+            con->path = cf->entries[i].value;
         } else {
+            error_count++;
             fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
         }
     }
+    return error_count;
 }
 
 void dumpContext(procContext* con) {
