@@ -136,29 +136,7 @@ char** processCmd(char* cmd, char** paras) {
 }
 
 
-
 int main() {
-    config_file_t *cf = read_config_file("./config.conf"); //TODO make function that loads command specific config
-    if (cf == NULL) {
-        fprintf(stderr, "Cannot open config file\n");
-        return 1;
-    }
-    if (cf->nr_entries < 0) {
-        fprintf(stderr, "The config file could not be parsed\n");
-    }
-    
-     procContext context;
-     context.path = NULL; //Initialise
-     context.path = NULL; //Initialise
-     parseConfig(cf, &context);
-     dumpContext(&context);
-
-    
-    if(!release_config(cf)) {
-        fprintf(stderr, "Error: Could not free config\n");
-    }
-    
-    
     char x[INPUT_BUFFER_SIZE];
    
     
@@ -175,8 +153,27 @@ int main() {
         }
         char* parameters[16];
         processCmd(x, parameters);
-        printf("filename: %s\n", basename(parameters[0]));
-        //system(x);
+        
+        char cf_path[256];
+        sprintf(cf_path, "./etc/ush/%s.conf", basename(parameters[0]));
+        
+        config_file_t *cf = read_config_file(cf_path); //TODO make function that loads command specific config
+        if (cf == NULL || cf->nr_entries < 0) {
+            fprintf(stderr, "Cannot open config file, using standard user, groups...\n");
+            return 1;
+        }
+        
+        procContext context;
+        context.path = NULL; //Initialise
+        context.path = NULL; //Initialise
+        parseConfig(cf, &context);
+        dumpContext(&context);
+
+        
+        if(!release_config(cf)) {
+            fprintf(stderr, "Error: Could not free config\n");
+        }
+        
         executeProcess(parameters, &context);
     }  
     return 0;
