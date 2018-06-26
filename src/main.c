@@ -47,9 +47,7 @@ void executeProcess(char** parameters, procContext* con) {
     }
     
     int pid = fork();
-	if(pid == 0) {
-        
-        
+	if(pid == 0) {   
         // execvp searches in PATH if 1. arg contains no slash
         if (execvp(parameters[0], parameters)) {
             printf("exec %s\n", strerror(errno));
@@ -57,7 +55,9 @@ void executeProcess(char** parameters, procContext* con) {
         }
         perror("exec");
 	} else {
-        // Set to original id
+        wait(&pid);
+        
+        // Set back to original id
         errno = 0;
         setresuid(ruid, euid, suid);
         perror("UID set");
@@ -66,9 +66,7 @@ void executeProcess(char** parameters, procContext* con) {
         perror("GID set");
         errno = 0;
         setgroups(group_count, sup_gid);
-        perror("Groups set");
-    
-        wait(&pid);
+        perror("Groups set");        
     }
 }
 
@@ -167,7 +165,7 @@ int main() {
    
     
     while(1) {
-        printf("Welcome to the User Shell!\n");
+        printf("\nWelcome to the User Shell!\n");
         printf("CMD: ");
         char* result = readInput(x);
         if(result == NULL || x == NULL) { //Exit with Ctrl-D
@@ -203,10 +201,15 @@ int main() {
                 fprintf(stderr, "Error: Could not free config\n");
             }
             
-            executeProcess(parameters, &context);
+            printf("CMD %s\n", parameters[0]);
+            parameters[0] = context.path; //Use always path from config
+            if (parameters[0] != NULL) {
+                executeProcess(parameters, &context);
+            }
+            printf("HIER %s\n", parameters[0]);
         } else {
             executeProcess(parameters, NULL);
-        }        
+        }
         
     }  
     return 0;
