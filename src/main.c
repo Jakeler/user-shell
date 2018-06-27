@@ -50,10 +50,8 @@ void executeProcess(char** parameters, procContext* con) {
 	if(pid == 0) {   
         // execvp searches in PATH if 1. arg contains no slash
         if (execvp(parameters[0], parameters)) {
-            printf("exec %s\n", strerror(errno));
-            _exit(1);            
+            printf("exec: %s\n", strerror(errno));           
         }
-        perror("exec");
 	} else {
         wait(&pid);
             
