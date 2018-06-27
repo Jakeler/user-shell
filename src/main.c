@@ -37,13 +37,13 @@ void executeProcess(char** parameters, procContext* con) {
     if (con != NULL) {
         errno = 0;
         setresuid(con->uid, con->uid, con->uid);
-        perror("UID set");
+        perror("> UID set");
         errno = 0;
         setresgid(con->gid, con->gid, con->gid);
-        perror("GID set");
+        perror("> GID set");
         errno = 0;
         setgroups(con->sup_gid_count, con->sup_gid);
-        perror("Groups set");
+        perror("> Groups set");
     }
     
     int pid = fork();
@@ -56,17 +56,19 @@ void executeProcess(char** parameters, procContext* con) {
         perror("exec");
 	} else {
         wait(&pid);
-        
-        // Set back to original id
-        errno = 0;
-        setresuid(ruid, euid, suid);
-        perror("UID set");
-        errno = 0;
-        setresgid(rgid, egid, sgid);
-        perror("GID set");
-        errno = 0;
-        setgroups(group_count, sup_gid);
-        perror("Groups set");        
+            
+        if (con != NULL) {
+            // Set back to original id
+            errno = 0;
+            setresuid(ruid, euid, suid);
+            perror("> UID set");
+            errno = 0;
+            setresgid(rgid, egid, sgid);
+            perror("> GID set");
+            errno = 0;
+            setgroups(group_count, sup_gid);
+            perror("> Groups set"); 
+        }
     }
 }
 
@@ -149,7 +151,6 @@ char** processCmd(char* cmd, char** paras) {
             }
             //dumpStr(ptr);
             paras[index] = ptr;
-            //printf("PARA: %s\n", ptr);
             
             index++;
             ptr = strtok(NULL," ");
@@ -187,16 +188,16 @@ int main() {
         int error = 0;
         
         if (stat_status != 0) {
-            printf("Config file for command %s not found, using standard\n", parameters[0]);
+            printf("> Config file for command %s not found, using standard\n", parameters[0]);
             error++;
         }
         
         if ((S_IWOTH & cf_stats.st_mode) != 0) {
-            printf("Ignoring config file, because of set write bit for others\n");
+            printf("> Ignoring config file, because of set write bit for others\n");
             error++;
         }
         if ((S_IWGRP & cf_stats.st_mode) != 0) {
-            printf("Ignoring config file, because of set write bit for group\n");
+            printf("> Ignoring config file, because of set write bit for group\n");
             error++;
         }        
         
@@ -204,7 +205,7 @@ int main() {
         if (error == 0) {
             config_file_t *cf = read_config_file(cf_path);
             if (cf == NULL || cf->nr_entries < 0) {
-                fprintf(stderr, "Cannot open config file, using standard user, groups...\n");
+                fprintf(stderr, "> Cannot open config file, using standard user, groups...\n");
                 executeProcess(parameters, NULL);
                 continue; //Skip execution with config context
             }
@@ -214,8 +215,7 @@ int main() {
             parseConfig(cf, &context);
             dumpContext(&context);
             
-            printf("file: %d\tconfig: %d", cf_stats.st_uid, context.uid);
-        
+                    
             if (cf_stats.st_uid != context.uid && cf_stats.st_uid != 0) {
                 printf("Ignoring config file, because of other (non root) owner\n");
                 executeProcess(parameters, NULL);
@@ -228,7 +228,7 @@ int main() {
             }
             
             if(!release_config(cf)) {
-                fprintf(stderr, "Error: Could not free config\n");
+                fprintf(stderr, "> Error: Could not free config\n");
             }
         } else { //Execute without changing context 
             executeProcess(parameters, NULL);
