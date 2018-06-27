@@ -130,8 +130,7 @@ void dumpStr(char* str) {
 }
 
 char* readInput(char* buffer) {    
-    //TODO Error on buffer overflow / malloc
-    //or switch to getline?   
+    //Cuts of more than buffer size
     return fgets(buffer, INPUT_BUFFER_SIZE, stdin);
     
 }
@@ -199,17 +198,15 @@ int main() {
         if ((S_IWGRP & cf_stats.st_mode) != 0) {
             printf("Ignoring config file, because of set write bit for group\n");
             error++;
-        }
-        
-
-        
+        }        
         
         
         if (error == 0) {
             config_file_t *cf = read_config_file(cf_path);
             if (cf == NULL || cf->nr_entries < 0) {
                 fprintf(stderr, "Cannot open config file, using standard user, groups...\n");
-                return 1;
+                executeProcess(parameters, NULL);
+                continue; //Skip execution with config context
             }
             
             procContext context;
