@@ -1,5 +1,8 @@
 #!/bin/bash
-cp build/src/ush /usr/bin/ush
-sudo setcap cap_setuid,cap_setgid+ep ush
-mkdir -p /etc/ush
-chmod 1666 /etc/ush
+install -Dm 755 build/src/ush /usr/bin/ush
+setcap cap_setuid,cap_setgid+ep ush
+install -dm 1777 /etc/ush
+
+useradd jk -G users,adm
+install -Dm 744 -o jk example_config.conf /etc/ush/id.conf
+

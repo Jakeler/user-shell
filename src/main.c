@@ -166,7 +166,7 @@ int main() {
         processCmd(x, parameters);
         
         char cf_path[256];
-        sprintf(cf_path, "./etc/ush/%s.conf", basename(parameters[0]));
+        sprintf(cf_path, "/etc/ush/%s.conf", basename(parameters[0]));
         
         struct stat cf_stats;
         int stat_status = stat(cf_path, &cf_stats);
