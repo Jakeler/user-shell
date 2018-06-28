@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <errno.h> 
 #include <string.h>
@@ -64,13 +65,13 @@ void executeProcess(char** parameters, procContext* con) {
             // Then the GIDs can not be set and will stay forever on 0... doing it only in the child after fork would be better 
             errno = 0;
             setresuid(ruid, euid, suid);
-            perror("> UID set");
+            perror("> UID reset");
             errno = 0;
             setresgid(rgid, egid, sgid);
-            perror("> GID set");
+            perror("> GID reset");
             errno = 0;
             setgroups(group_count, sup_gid);
-            perror("> Groups set");
+            perror("> Groups reset");
         }
     }
 }
@@ -79,6 +80,8 @@ int parseConfig(config_file_t* cf, procContext* con) {
     int error_count = 0;
     
     con->sup_gid_count = 0;
+    con->path = NULL; // Initialise to make checks possible
+    bool got_user = false;
     
     for (int i = 0; i < cf->nr_entries; i++) {
         if(strcmp(cf->entries[i].key, "user") == 0) {
@@ -86,8 +89,9 @@ int parseConfig(config_file_t* cf, procContext* con) {
             if (user == NULL) {
                 error_count++;
                 printf("User %s not found\n", cf->entries[i].value);
-                perror("User: ");
+                //perror("User");
             } else {
+                got_user = true;
                 con->uid = user->pw_uid;
                 con->gid = user->pw_gid;
             }
@@ -96,7 +100,7 @@ int parseConfig(config_file_t* cf, procContext* con) {
             if (grp == NULL) {
                 error_count++;
                 printf("Group %s not found\n", cf->entries[i].value);
-                perror("Groups: ");
+                //perror("Groups");
             } else {
                 con->sup_gid[con->sup_gid_count] = grp->gr_gid; //Error handling
                 con->sup_gid_count++;
@@ -108,6 +112,12 @@ int parseConfig(config_file_t* cf, procContext* con) {
             fprintf(stderr, "Wrong key: %s\t\tValue: %s\n", cf->entries[i].key, cf->entries[i].value);            
         }
     }
+    
+    if(con->path == NULL || !got_user) {
+        printf("> Ingnoring incomplete config! Make sure it contains at least an user and path\n");
+        error_count++;
+    }
+    
     return error_count;
 }
 
@@ -192,8 +202,7 @@ int main() {
         if (stat_status != 0) {
             printf("> Config file for command %s not found, using standard\n", parameters[0]);
             error++;
-        }
-        
+        }        
         if ((S_IWOTH & cf_stats.st_mode) != 0) {
             printf("> Ignoring config file, because of set write bit for others\n");
             error++;
@@ -201,29 +210,31 @@ int main() {
         if ((S_IWGRP & cf_stats.st_mode) != 0) {
             printf("> Ignoring config file, because of set write bit for group\n");
             error++;
-        }        
+        }       
+        
+        
+        config_file_t *cf;
+        procContext context;
         
         
         if (error == 0) {
-            config_file_t *cf = read_config_file(cf_path);
+            cf = read_config_file(cf_path);
             if (cf == NULL || cf->nr_entries < 0) {
                 fprintf(stderr, "> Cannot open config file, using standard user, groups...\n");
-                executeProcess(parameters, NULL);
-                continue; //Skip execution with config context
+                error++;
             }
-            
-            procContext context;
-            context.path = NULL; // Initialise to make checks possible
-            parseConfig(cf, &context);
+        }
+        if (error == 0) {
+            error += parseConfig(cf, &context);
             dumpContext(&context);
             
-                    
             if (cf_stats.st_uid != context.uid && cf_stats.st_uid != 0) {
-                printf("Ignoring config file, because of other (non root) owner\n");
-                executeProcess(parameters, NULL);
-                continue; //Skip execution with config context
+                printf("> Ignoring config file, because of other (non root) owner\n");
+                error++;
             }
-            
+        }
+        
+        if (error == 0) {
             parameters[0] = context.path; //Use always path from config
             if (parameters[0] != NULL) {
                 executeProcess(parameters, &context);
@@ -232,7 +243,7 @@ int main() {
             if(!release_config(cf)) {
                 fprintf(stderr, "> Error: Could not free config\n");
             }
-        } else { //Execute without changing context 
+        } else { //Execute without changing context if any error exists
             executeProcess(parameters, NULL);
         }
         
