@@ -27,52 +27,26 @@ typedef struct {
 
 
 void executeProcess(char** parameters, procContext* con) {
-    // Save current IDs
-    uid_t ruid, euid, suid;
-    getresuid(&ruid, &euid, &suid);
-    gid_t rgid, egid, sgid;
-    getresgid(&rgid, &egid, &sgid);
-    
-    gid_t sup_gid[32];
-    int group_count = getgroups(0, sup_gid);
-    
-    // Change IDs before fork to give it the changes
-    if (con != NULL) {
-        errno = 0;
-        setresuid(con->uid, con->uid, con->uid);
-        perror("> UID set");
-        errno = 0;
-        setresgid(con->gid, con->gid, con->gid);
-        perror("> GID set");
-        errno = 0;
-        setgroups(con->sup_gid_count, con->sup_gid);
-        perror("> Groups set");
-    }
-    
+   
     int pid = fork();
 	if(pid == 0) {   
+        if (con != NULL) {
+            errno = 0;
+            setresuid(con->uid, con->uid, con->uid);
+            perror("> UID set");
+            errno = 0;
+            setresgid(con->gid, con->gid, con->gid);
+            perror("> GID set");
+            errno = 0;
+            setgroups(con->sup_gid_count, con->sup_gid);
+            perror("> Groups set");
+        }
         // execvp searches in PATH if 1. arg contains no slash, absolute paths from the config get used directly
         if (execvp(parameters[0], parameters)) {
             printf("exec: %s\n", strerror(errno));           
         }
 	} else {
         wait(&pid);
-            
-        if (con != NULL) {
-           
-            // Set back to original id
-            // Known problem: changing from 0 to all nonzero UIDs clears all capabilities (in all sets)
-            // Then the GIDs can not be set and will stay forever on 0... doing it only in the child after fork would be better 
-            errno = 0;
-            setresuid(ruid, euid, suid);
-            perror("> UID reset");
-            errno = 0;
-            setresgid(rgid, egid, sgid);
-            perror("> GID reset");
-            errno = 0;
-            setgroups(group_count, sup_gid);
-            perror("> Groups reset");
-        }
     }
 }
 
