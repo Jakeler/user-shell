@@ -13,6 +13,7 @@
 #include <pwd.h>
 #include <sys/wait.h>
 
+
 #define INPUT_BUFFER_SIZE 256
 
 typedef struct {
@@ -20,8 +21,9 @@ typedef struct {
     uid_t uid;
     gid_t gid;
     gid_t sup_gid[32]; //32 on Linux < 2.6.3, 2^16 on modern Linux
-    size_t sup_gid_count; //pointers dont include size, so add it?
+    size_t sup_gid_count;
 } procContext;
+
 
 void executeProcess(char** parameters, procContext* con) {
     // Save current IDs
@@ -48,7 +50,7 @@ void executeProcess(char** parameters, procContext* con) {
     
     int pid = fork();
 	if(pid == 0) {   
-        // execvp searches in PATH if 1. arg contains no slash
+        // execvp searches in PATH if 1. arg contains no slash, absolute paths from the config get used directly
         if (execvp(parameters[0], parameters)) {
             printf("exec: %s\n", strerror(errno));           
         }
@@ -56,7 +58,10 @@ void executeProcess(char** parameters, procContext* con) {
         wait(&pid);
             
         if (con != NULL) {
+           
             // Set back to original id
+            // Known problem: changing from 0 to all nonzero UIDs clears all capabilities (in all sets)
+            // Then the GIDs can not be set and will stay forever on 0... doing it only in the child after fork would be better 
             errno = 0;
             setresuid(ruid, euid, suid);
             perror("> UID set");
@@ -65,7 +70,7 @@ void executeProcess(char** parameters, procContext* con) {
             perror("> GID set");
             errno = 0;
             setgroups(group_count, sup_gid);
-            perror("> Groups set"); 
+            perror("> Groups set");
         }
     }
 }
@@ -130,7 +135,7 @@ void dumpStr(char* str) {
 }
 
 char* readInput(char* buffer) {    
-    //Cuts of more than buffer size
+    //Cuts of the input if it is more than the buffer size
     return fgets(buffer, INPUT_BUFFER_SIZE, stdin);
     
 }
@@ -170,8 +175,7 @@ int main() {
             printf("Exiting...\n");
             return 0;
         }
-        if(x[0] == '\n') {
-            //printf("No input\n");
+        if(x[0] == '\n') { //just return hit without any input
             continue;
         }
         char* parameters[16];
@@ -209,7 +213,7 @@ int main() {
             }
             
             procContext context;
-            context.path = NULL; //Initialise
+            context.path = NULL; // Initialise to make checks possible
             parseConfig(cf, &context);
             dumpContext(&context);
             
